@@ -22,14 +22,14 @@ The PDF analyzer is designed to help users interact with the content of PDF file
 - Upload PDF files using the file uploader in the sidebar.
 
 
+**An image showing the UI**
+![alt text](image.png)
+
 
 ## Current Issues
 
 There is a known issue with getting an output due to the use of a legacy approach in the code. The `ConversationBufferMemory` class is deprecated.The  issue need to be addressed to ensure the application functions correctly.
 
-
-**An image showing the UI**
-![alt text](image.png)
 
 ## Conclusion
 

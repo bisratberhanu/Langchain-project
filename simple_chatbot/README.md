@@ -7,20 +7,6 @@ The simple chat bot is built using LangChain and LLaMA. It is developed in a Jup
 - **simple_langchain.ipynb**: The Jupyter Notebook containing the code for the chat bot.
 - **README.md**: Documentation for the simple chat bot.
 
-## Installation
-To run the notebook, you need to install the required packages. The following packages are used:
-
-- `torch==2.0.1`
-- `transformers==4.33.2`
-- `langchain==0.0.299`
-- `chromadb==0.4.10`
-- `xformers==0.0.21`
-- `sentence_transformers==2.2.2`
-- `tokenizers==0.14.0`
-- `optimum==1.13.1`
-- `auto-gptq==0.4.2`
-- `unstructured==0.10.16`
-
 ### Usage
 **Load the Tokenizer**: The tokenizer is loaded from the pre-trained TheBloke/Llama-2-13b-Chat-GPTQ model, enabling text input to be converted into tokenized format for processing.
 

@@ -2,6 +2,7 @@
 This repository contains two main parts:
 
 **Simple Chat Bot**: A very simple chat bot built using LangChain and LLaMA, developed in a Jupyter Notebook. The model is run locally.
+
 **PDF Analyzer**: A more comprehensive PDF analyzer built in Python, utilizing LangChain and featuring a user interface built with Streamlit.
 
 
