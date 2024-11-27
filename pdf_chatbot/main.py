@@ -67,29 +67,34 @@ def get_conversational_chain(retriever):
     )
     return chain
 
+
 def user_input(user_question):
     try:
+        # Load the FAISS index
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+
+        # Create a retriever
+        retriever = new_db.as_retriever()
+
+        # Pass the retriever to the conversational chain
+        chain = get_conversational_chain(retriever)
+
+        # Retrieve documents based on the user's question
+        docs = retriever.invoke({"query": user_question})  # Updated to use invoke()
+
+        # Run the question through the conversational chain
+        response = chain.invoke(
+            {"input_documents": docs["documents"], "query": user_question}  # Updated keys
+        )
+
+        # Save conversation history
         if "chat_history" not in st.session_state:
             st.session_state["chat_history"] = []
 
-        # Load FAISS index and create retriever
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
-        retriever = new_db.as_retriever()
-
-        # Create chain with retriever
-        chain = get_conversational_chain(retriever)
-
-        # Retrieve documents
-        docs = retriever.invoke({"query": user_question})
-        if not docs or "documents" not in docs:
-            raise ValueError("No documents retrieved or invalid retriever output.")
-
-        # Execute chain
-        response = chain.invoke({"input_documents": docs["documents"], "query": user_question})
-
-        # Update session state
         st.session_state["chat_history"].append((user_question, response["output_text"]))
+
+        # Limit history to the last 3 exchanges
         if len(st.session_state["chat_history"]) > 3:
             st.session_state["chat_history"] = st.session_state["chat_history"][-3:]
 
