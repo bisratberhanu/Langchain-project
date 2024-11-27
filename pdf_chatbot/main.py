@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as geneai
 from dotenv import load_dotenv
+import logging
 import os
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -9,13 +10,18 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.chains import RetrievalQA
 
 
 load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+geneai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Initialize the Google Generative AI model
 model = geneai.GenerativeModel("gemini-pro")
+
+# Set up logging
+logging.basicConfig(level=logging.ERROR)
+logger = logging.getLogger(__name__)
 
 
 def get_pdf_text(pdf_docs):
@@ -38,45 +44,60 @@ def get_vector_store(text_chunks):
     vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
 
-def get_conversational_chain():
+
+def get_conversational_chain(retriever):
     prompt_template = """
-    Answer the question as detailed as possible from the provided context, make sure to provide all the details, if the answer is not
-    provided context just say, "answer is not available in the context", don't provide the wrong answer\n\n
-    Context:\n {context}?\n
-    Question: \n{question}\n
+    Answer the question as detailed as possible from the provided context. If the answer is not
+    provided in the context, just say, "answer is not available in the context". Do not provide the wrong answer.\n\n
+    Context:\n{context}\n
+    Question:\n{question}\n
     Answer:
     """
     model = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
 
-    memory = ConversationBufferMemory(memory_key="chat_history", input_key="question", return_messages=True)
-    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt, memory=memory)
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+    chain = RetrievalQA.from_chain_type(
+        llm=model,
+        retriever=retriever,
+        chain_type="stuff",
+        chain_type_kwargs={"prompt": prompt},
+        memory=memory,
+    )
     return chain
 
 def user_input(user_question):
     try:
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
-
-        docs = new_db.similarity_search(user_question)
-
-        chain = get_conversational_chain()
-        response = chain(
-            {"input_documents": docs, "question": user_question},
-            return_only_outputs=True
-        )
-
         if "chat_history" not in st.session_state:
             st.session_state["chat_history"] = []
-        
-        st.session_state["chat_history"].append((user_question, response["output_text"]))
 
+        # Load FAISS index and create retriever
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+        retriever = new_db.as_retriever()
+
+        # Create chain with retriever
+        chain = get_conversational_chain(retriever)
+
+        # Retrieve documents
+        docs = retriever.invoke({"query": user_question})
+        if not docs or "documents" not in docs:
+            raise ValueError("No documents retrieved or invalid retriever output.")
+
+        # Execute chain
+        response = chain.invoke({"input_documents": docs["documents"], "query": user_question})
+
+        # Update session state
+        st.session_state["chat_history"].append((user_question, response["output_text"]))
         if len(st.session_state["chat_history"]) > 3:
             st.session_state["chat_history"] = st.session_state["chat_history"][-3:]
 
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         st.error("An error occurred while processing your request. Please try again later.")
+
+
 
 def main():
     st.set_page_config("Chat PDF")
